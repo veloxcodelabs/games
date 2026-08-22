@@ -1,0 +1,6 @@
+{
+  "name": "Game Key Finder & Store",
+  "description": "Search games to find the best verified deals and purchase digital activation keys directly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
