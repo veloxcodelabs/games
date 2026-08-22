@@ -5,6 +5,7 @@ export interface GamePrice {
   edition?: string;
   region?: string;
   platform?: string;
+  steamAppId?: number;
   coverImage?: string;
   headerImage?: string;
   screenshots?: string[];

@@ -1,6 +1,7 @@
 import React from 'react';
 import { GamePrice } from '../types';
 import { ShieldCheck, Zap, ShoppingCart, Info, Star, Tag } from 'lucide-react';
+import { getFallbackGameImageUrl } from '../services/gameArtwork';
 
 interface GameCardProps {
   game: GamePrice;
@@ -28,9 +29,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game, onBuy, onViewDetails }
           loading="lazy"
           className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
-            // Fallback image on error
-            (e.target as HTMLImageElement).src =
-              'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
+            (e.target as HTMLImageElement).src = getFallbackGameImageUrl(game.steamAppId);
           }}
         />
 

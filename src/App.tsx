@@ -8,6 +8,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { MyLibraryDrawer } from './components/MyLibraryDrawer';
 import { TrustSection } from './components/TrustSection';
+import { fetchFeaturedGamesWithGemini, searchGamesWithGemini } from './services/geminiService';
 import {
   Sparkles,
   Loader2,
@@ -97,16 +98,13 @@ export default function App() {
     }
   }, []);
 
-  // Load featured games on mount / currency switch
+  // Load featured games on mount / currency switch using Gemini AI
   const loadFeaturedGames = useCallback(async (curr: string) => {
     setIsLoadingFeatured(true);
     try {
-      const res = await fetch(`/api/featured?currency=${curr}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.games && Array.isArray(data.games)) {
-          setFeaturedGames(data.games);
-        }
+      const games = await fetchFeaturedGamesWithGemini(curr);
+      if (games && Array.isArray(games)) {
+        setFeaturedGames(games);
       }
     } catch (err) {
       console.error('Failed to load featured games:', err);
@@ -119,7 +117,7 @@ export default function App() {
     loadFeaturedGames(currency);
   }, [currency, loadFeaturedGames]);
 
-  // Perform search against price index backend
+  // Perform search with Gemini AI directly in frontend
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
 
@@ -128,20 +126,14 @@ export default function App() {
     setSearchError(null);
 
     try {
-      const url = `/api/search?q=${encodeURIComponent(searchQuery)}&currency=${currency}&platform=${encodeURIComponent(activePlatform)}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error('Failed to fetch game prices.');
-      }
-      const data = await res.json();
-
-      if (data.results && Array.isArray(data.results)) {
-        setSearchResults(data.results);
+      const results = await searchGamesWithGemini(searchQuery, currency, activePlatform || 'All Platforms');
+      if (results && Array.isArray(results)) {
+        setSearchResults(results);
       } else {
         setSearchResults([]);
       }
     } catch (err: any) {
-      setSearchError(err.message || 'Unable to fetch game prices. Please try again.');
+      setSearchError(err.message || 'Unable to fetch game prices with Gemini AI. Please try again.');
       setSearchResults([]);
     } finally {
       setIsSearching(false);

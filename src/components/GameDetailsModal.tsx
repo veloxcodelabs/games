@@ -11,6 +11,7 @@ import {
   Globe,
   Sparkles,
 } from 'lucide-react';
+import { getFallbackGameImageUrl } from '../services/gameArtwork';
 
 interface GameDetailsModalProps {
   game: GamePrice;
@@ -43,8 +44,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
             referrerPolicy="no-referrer"
             className="h-full w-full object-cover object-center"
             onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
+              (e.target as HTMLImageElement).src = getFallbackGameImageUrl(game.steamAppId);
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />

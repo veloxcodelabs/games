@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getFallbackGameImageUrl } from '../services/gameArtwork';
 
 interface CheckoutModalProps {
   game: GamePrice;
@@ -68,16 +69,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       val = `${val.slice(0, 2)}/${val.slice(2, 4)}`;
     }
     setCardExpiry(val);
-  };
-
-  // 1-Click Fill Demo Card
-  const fillTestCard = () => {
-    setEmail('gamer@example.com');
-    setCustomerName('Alex Turner');
-    setCardNumber('4242 4242 4242 4242');
-    setCardExpiry('12/28');
-    setCardCvc('888');
-    setErrorMessage(null);
   };
 
   // Submit payment handler: POST to /api/create-checkout-session and redirect to Stripe Checkout
@@ -275,6 +266,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 alt={game.name}
                 referrerPolicy="no-referrer"
                 className="h-16 w-24 rounded-lg object-cover bg-zinc-950 border border-zinc-800 flex-shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getFallbackGameImageUrl(game.steamAppId);
+                }}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -316,18 +310,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Email & Customer Information */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div>
                 <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-emerald-400" />
                   <span>Delivery Email Address *</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={fillTestCard}
-                  className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
-                >
-                  ⚡ Auto-Fill Demo Details
-                </button>
               </div>
               <input
                 id="checkout-email-input"
