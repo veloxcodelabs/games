@@ -315,7 +315,7 @@ export const STORES = {
     discountText: "10% OFF",
     getAffiliateUrl: (title: string) => 
       title
-        ? `https://www.kinguin.net/search/${encodeURIComponent(title)}?r=34o3fs14tewgg`
+        ? `https://www.kinguin.net/listing?active=1&phrase=${encodeURIComponent(title)}&r=34o3fs14tewgg`
         : `https://www.kinguin.net/?r=34o3fs14tewgg`
   }
 };
