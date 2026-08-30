@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { GamePrice } from '../types';
 import { getOfficialGameImages, resolveSteamAppId, KNOWN_STEAM_GAMES } from './gameArtwork';
+import { buildGamivoAffiliateUrl } from './gamePriceService';
 
 // Currency symbol resolver
 export function getCurrencySymbol(curr: string): string {
@@ -165,6 +166,7 @@ Return pure JSON with this exact array structure:
       platform: 'PC (Steam / Global)',
       inStock: true,
       offersCount: 12,
+      affiliateUrl: buildGamivoAffiliateUrl(g.name),
       allEditions: [
         { edition: 'Standard Edition', region: 'Global', basePrice: convertedPrice, markup: 0, customerPrice: convertedPrice },
         { edition: 'Deluxe Edition', region: 'Global', basePrice: Number((convertedPrice * 1.3).toFixed(2)), markup: 0, customerPrice: Number((convertedPrice * 1.3).toFixed(2)) },
@@ -290,6 +292,7 @@ Return pure JSON with this exact array structure:
       headerImage: realImages.headerImage,
       inStock: true,
       offersCount: 8,
+      affiliateUrl: buildGamivoAffiliateUrl(query),
       allEditions: [
         { edition: 'Standard Edition', region: 'Global', basePrice, markup: 0, customerPrice: basePrice },
         { edition: 'Deluxe Edition', region: 'Global', basePrice: Number((basePrice * 1.3).toFixed(2)), markup: 0, customerPrice: Number((basePrice * 1.3).toFixed(2)) },

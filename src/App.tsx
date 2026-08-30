@@ -8,7 +8,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { MyLibraryDrawer } from './components/MyLibraryDrawer';
 import { TrustSection } from './components/TrustSection';
-import { fetchFeaturedGamesWithGemini, searchGamesWithGemini } from './services/geminiService';
+import { searchGames, fetchFeaturedDeals } from './services/gamePriceService';
 import {
   Sparkles,
   Loader2,
@@ -18,6 +18,7 @@ import {
   Tag,
   Search,
   CheckCircle2,
+  ExternalLink,
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEYS = 'keyvault_purchased_keys';
@@ -61,48 +62,11 @@ export default function App() {
     }
   }, [purchasedKeys]);
 
-  // Check URL params for Stripe checkout success or cancel return
-  useEffect(() => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get('status');
-      const sessionId = urlParams.get('session_id');
-
-      if (status === 'success') {
-        const orderId = sessionId ? `STP-${sessionId.slice(-8).toUpperCase()}` : `STP-${Date.now()}`;
-        const licenseKey = `${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-        
-        const successOrder: PaymentResult = {
-          success: true,
-          orderId,
-          licenseKey,
-          gameName: 'Purchased Game Key (Stripe Verified)',
-          edition: 'Verified Edition',
-          platform: 'Global Digital Key',
-          amount: 0,
-          currency: 'USD',
-          customerEmail: 'Stripe Customer',
-          timestamp: new Date().toISOString(),
-        };
-
-        setCompletedOrder(successOrder);
-
-        // Clean query params from URL without reload
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (status === 'cancelled') {
-        setSearchError('Stripe Checkout was cancelled.');
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } catch (err) {
-      console.error('Error parsing return URL params:', err);
-    }
-  }, []);
-
-  // Load featured games on mount / currency switch using Gemini AI
+  // Load featured games on mount / currency switch
   const loadFeaturedGames = useCallback(async (curr: string) => {
     setIsLoadingFeatured(true);
     try {
-      const games = await fetchFeaturedGamesWithGemini(curr);
+      const games = await fetchFeaturedDeals(curr);
       if (games && Array.isArray(games)) {
         setFeaturedGames(games);
       }
@@ -117,7 +81,7 @@ export default function App() {
     loadFeaturedGames(currency);
   }, [currency, loadFeaturedGames]);
 
-  // Perform search with Gemini AI directly in frontend
+  // Perform search
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
 
@@ -126,14 +90,14 @@ export default function App() {
     setSearchError(null);
 
     try {
-      const results = await searchGamesWithGemini(searchQuery, currency, activePlatform || 'All Platforms');
+      const results = await searchGames(searchQuery, currency);
       if (results && Array.isArray(results)) {
         setSearchResults(results);
       } else {
         setSearchResults([]);
       }
     } catch (err: any) {
-      setSearchError(err.message || 'Unable to fetch game prices with Gemini AI. Please try again.');
+      setSearchError(err.message || 'Unable to fetch game prices. Please try again.');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -144,22 +108,25 @@ export default function App() {
   const handlePlatformChange = (newPlatform: string) => {
     setActivePlatform(newPlatform);
     if (query.trim()) {
-      // Re-trigger search with new platform
       setTimeout(() => {
         handleSearch(query);
       }, 50);
     }
   };
 
-  // Open checkout for a game
+  // Open checkout or details modal for a game
   const handleInitiateBuy = (game: GamePrice, edition: GameEditionPrice | null = null) => {
+    // If affiliateUrl exists, user can directly open GAMIVO or checkout modal
+    if (game.affiliateUrl) {
+      window.open(game.affiliateUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     setSelectedGameForCheckout(game);
     setSelectedEditionForCheckout(edition);
   };
 
   // Order completion callback
   const handlePaymentSuccess = (result: PaymentResult) => {
-    // Record into purchased keys library
     const newKeyRecord: PurchasedKey = {
       id: `pk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       orderId: result.orderId,
@@ -174,7 +141,7 @@ export default function App() {
       currencySymbol: selectedGameForCheckout?.currencySymbol || '$',
       purchaseDate: result.timestamp,
       customerEmail: result.customerEmail,
-      paymentMethod: 'Direct Payment Gateway',
+      paymentMethod: 'GAMIVO Partner Direct',
       status: 'delivered',
     };
 
@@ -232,7 +199,7 @@ export default function App() {
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Verified lowest available digital key pricing. Seller names masked for direct secure purchase.
+                  Live verified market pricing • Direct G2A (12% OFF), Kinguin (10% OFF) &amp; GAMIVO (8% OFF) affiliate deal links.
                 </p>
               </div>
 
@@ -243,9 +210,9 @@ export default function App() {
                   setQuery('');
                   setSearchResults([]);
                 }}
-                className="text-xs font-semibold text-zinc-400 hover:text-emerald-400 transition-colors"
+                className="text-xs font-semibold text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
               >
-                ← Back to Featured Games
+                ← Back to Featured Deals
               </button>
             </div>
 
@@ -264,9 +231,9 @@ export default function App() {
                   <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Fetching Live Game Prices</h3>
+                  <h3 className="text-base font-bold text-white">Searching Global Games Database</h3>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Indexing latest offers & calculating the lowest verified price...
+                    Fetching live game prices and building G2A, GAMIVO &amp; Kinguin affiliate links...
                   </p>
                 </div>
               </div>
@@ -276,7 +243,6 @@ export default function App() {
                   <GameCard
                     key={game.id}
                     game={game}
-                    onBuy={(g) => handleInitiateBuy(g)}
                     onViewDetails={(g) => setSelectedGameForDetails(g)}
                   />
                 ))}
@@ -302,24 +268,34 @@ export default function App() {
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white">
-                  Trending Games • Live Lowest Prices
+                  Trending Game Deals • Live Market Pricing
                 </h2>
                 <p className="text-xs text-zinc-400">
-                  Real-time verified market lows, ready for direct 1-click purchase.
+                  Real-time verified market prices with instant G2A, GAMIVO and Kinguin referral deals.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Direct Purchase • Genuine Activation</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+              <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>G2A: SUMMER12 (12% OFF)</span>
+              </span>
+              <span className="flex items-center gap-1 text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-full border border-orange-500/20">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Kinguin: KINGUIN10 (10% OFF)</span>
+              </span>
+              <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>GAMIVO: BASICS (8% OFF)</span>
+              </span>
             </div>
           </div>
 
           {isLoadingFeatured && featuredGames.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-              <p className="text-xs text-zinc-400">Indexing verified key catalogue...</p>
+              <p className="text-xs text-zinc-400">Loading verified live deals catalogue...</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -327,7 +303,6 @@ export default function App() {
                 <GameCard
                   key={game.id}
                   game={game}
-                  onBuy={(g) => handleInitiateBuy(g)}
                   onViewDetails={(g) => setSelectedGameForDetails(g)}
                 />
               ))}
@@ -343,12 +318,23 @@ export default function App() {
       <footer className="border-t border-zinc-800/80 bg-zinc-950 py-8 px-4 text-center text-xs text-zinc-500">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-zinc-300">KeyVault Direct</span>
+            <span className="font-bold text-zinc-300">KeyVault Deals</span>
             <span>•</span>
-            <span>Real-time verified price indexing and secure digital key delivery</span>
+            <span>Global Live Price Index • Verified G2A, GAMIVO &amp; Kinguin Partner Deals</span>
           </div>
-          <div>
-            <span>100% Secure Digital Key Delivery Engine</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span>G2A Code:</span>
+              <code className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded font-mono">SUMMER12</code>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Kinguin Code:</span>
+              <code className="text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded font-mono">KINGUIN10</code>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>GAMIVO Code:</span>
+              <code className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono">BASICS</code>
+            </div>
           </div>
         </div>
       </footer>

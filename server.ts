@@ -292,119 +292,140 @@ const QUERY_SYNONYMS: Record<string, string> = {
   'civ 7': 'Civilization VII',
 };
 
-// Search endpoint: query Allkeyshop catalogue & live pricing
-app.get('/api/search', async (req, res) => {
+export const STORES = {
+  g2a: {
+    name: "G2A",
+    voucherCode: "SUMMER12",
+    discountText: "12% OFF",
+    getAffiliateUrl: (title: string) => 
+      title 
+        ? `https://www.g2a.com/search?query=${encodeURIComponent(title)}&reflink=reflink-979532d1c4`
+        : `https://www.g2a.com/n/reflink-979532d1c4`
+  },
+  gamivo: {
+    name: "GAMIVO",
+    voucherCode: "BASICS",
+    discountText: "8% OFF",
+    getAffiliateUrl: (title: string) => 
+      `https://www.gamivo.com/search/${encodeURIComponent(title)}?glv=nov5oasf`
+  },
+  kinguin: {
+    name: "Kinguin",
+    voucherCode: "KINGUIN10",
+    discountText: "10% OFF",
+    getAffiliateUrl: (title: string) => 
+      title
+        ? `https://www.kinguin.net/search/${encodeURIComponent(title)}?r=34o3fs14tewgg`
+        : `https://www.kinguin.net/?r=34o3fs14tewgg`
+  }
+};
+
+export function getMerchantDeals(title: string) {
+  const cleanTitle = (title || '').replace(/[®™]/g, '').trim();
+  return [
+    {
+      storeName: STORES.g2a.name,
+      affiliateUrl: STORES.g2a.getAffiliateUrl(cleanTitle),
+      voucherCode: STORES.g2a.voucherCode,
+      discountText: STORES.g2a.discountText,
+    },
+    {
+      storeName: STORES.gamivo.name,
+      affiliateUrl: STORES.gamivo.getAffiliateUrl(cleanTitle),
+      voucherCode: STORES.gamivo.voucherCode,
+      discountText: STORES.gamivo.discountText,
+    },
+    {
+      storeName: STORES.kinguin.name,
+      affiliateUrl: STORES.kinguin.getAffiliateUrl(cleanTitle),
+      voucherCode: STORES.kinguin.voucherCode,
+      discountText: STORES.kinguin.discountText,
+    }
+  ];
+}
+
+// Search endpoint: queries CheapShark API & adds G2A/GAMIVO affiliate deals
+app.get(['/api/search', '/api/search.js'], async (req, res) => {
   const startTime = Date.now();
-  const rawQuery = (req.query.q as string || '').trim();
+  const rawQuery = ((req.query.title as string) || (req.query.q as string) || (req.query.query as string) || '').trim();
   const currency = ((req.query.currency as string) || 'USD').toUpperCase();
-  const platform = (req.query.platform as string) || '';
 
   if (!rawQuery) {
-    return res.json({
-      query: '',
-      results: [],
-      totalFound: 0,
-      processingTimeMs: 0,
-    });
+    return res.json([]);
   }
 
   // Check synonym map
   const lowerQ = rawQuery.toLowerCase();
   const query = QUERY_SYNONYMS[lowerQ] || rawQuery;
 
-  const cacheKey = `search:${query.toLowerCase()}:${currency}:${platform}`;
+  const cacheKey = `cs_search:${query.toLowerCase()}:${currency}`;
   const cached = searchCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return res.json(cached.data);
   }
 
   try {
-    const aksService = new AllkeyshopService({
-      currency: currency.toLowerCase(),
-      platform: platform,
+    const cheapSharkUrl = `https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(query)}`;
+    const csResponse = await fetch(cheapSharkUrl, { signal: AbortSignal.timeout(6000) });
+
+    if (!csResponse.ok) {
+      throw new Error(`CheapShark HTTP error ${csResponse.status}`);
+    }
+
+    const rawGames: any[] = await csResponse.json();
+
+    if (!Array.isArray(rawGames)) {
+      return res.json([]);
+    }
+
+    // Map each item to return: gameID, external, cheapest, thumb, steamAppID, affiliateUrl, and merchantDeals
+    const mappedResults = rawGames.map((game) => {
+      const title = game.external || query;
+      const steamAppID = game.steamAppID || null;
+      const steamAppIdNum = steamAppID ? parseInt(steamAppID, 10) : undefined;
+      const thumb =
+        game.thumb ||
+        (steamAppIdNum
+          ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppIdNum}/capsule_616x353.jpg`
+          : '');
+
+      return {
+        gameID: String(game.gameID || ''),
+        external: title,
+        cheapest: String(game.cheapest || '0.00'),
+        thumb: thumb,
+        steamAppID: steamAppID,
+        affiliateUrl: STORES.gamivo.getAffiliateUrl(title),
+        merchantDeals: getMerchantDeals(title),
+      };
     });
 
-    const findResult = await aksService.find(query);
-    let matchedGames: { id: number; name: string }[] = [];
-
-    if (findResult && findResult.games && findResult.games.length > 0) {
-      const qLower = query.toLowerCase();
-
-      // Custom relevance scoring
-      const scored = findResult.games.map((g: any) => {
-        const nameLower = g.name.toLowerCase();
-        let score = 0;
-
-        if (nameLower === qLower) score += 1000;
-        else if (nameLower.startsWith(qLower)) score += 500;
-        else if (nameLower.includes(qLower)) score += 200;
-
-        // Penalize DLCs, accounts, or extra bundles if searching general game
-        if (nameLower.includes('account')) score -= 150;
-        if (nameLower.includes('dlc') || nameLower.includes('pack')) score -= 50;
-        if (nameLower.includes('soundtrack')) score -= 100;
-
-        // Platform bonus if platform matched
-        if (platform && nameLower.includes(platform.toLowerCase())) score += 100;
-
-        return { ...g, score };
-      });
-
-      scored.sort((a: any, b: any) => b.score - a.score);
-      matchedGames = scored.slice(0, 12);
-    }
-
-    // If search didn't return matches, create search candidate for direct search
-    if (matchedGames.length === 0) {
-      matchedGames.push({
-        id: Math.floor(Math.random() * 90000) + 10000,
-        name: query,
-      });
-    }
-
-    // Fetch prices for the top matches in parallel (limit concurrency to 6 for speed)
-    const results = await Promise.all(
-      matchedGames.slice(0, 6).map(async (game) => {
-        try {
-          return await getGamePriceDetails(game.id, game.name, currency, platform);
-        } catch (e) {
-          return null;
-        }
-      })
-    );
-
-    const validResults = results.filter(Boolean);
-
-    const responsePayload = {
-      query,
-      results: validResults,
-      totalFound: validResults.length,
-      processingTimeMs: Date.now() - startTime,
-    };
-
     searchCache.set(cacheKey, {
-      data: responsePayload,
+      data: mappedResults,
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
-    return res.json(responsePayload);
+    return res.json(mappedResults);
   } catch (error: any) {
-    console.error('Search error:', error);
-    // Fallback: single simulated item
-    const fallbackPrice = await getGamePriceDetails(10539, query, currency);
-    return res.json({
-      query,
-      results: [fallbackPrice],
-      totalFound: 1,
-      processingTimeMs: Date.now() - startTime,
-    });
+    console.error('Price search error:', error);
+    // Graceful fallback single response with affiliate links
+    const fallbackItem = {
+      gameID: '0',
+      external: query,
+      cheapest: '14.99',
+      thumb: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
+      steamAppID: null,
+      affiliateUrl: STORES.gamivo.getAffiliateUrl(query),
+      merchantDeals: getMerchantDeals(query),
+    };
+    return res.json([fallbackItem]);
   }
 });
 
-// Featured/Trending games endpoint
-app.get('/api/featured', async (req, res) => {
+// Featured/Trending games endpoint using live market deals
+app.get(['/api/deals', '/api/featured'], async (req, res) => {
   const currency = ((req.query.currency as string) || 'USD').toUpperCase();
-  const cacheKey = `featured:${currency}`;
+  const cacheKey = `market_deals:${currency}`;
   const cached = searchCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
@@ -412,28 +433,61 @@ app.get('/api/featured', async (req, res) => {
   }
 
   try {
-    const featuredResults = await Promise.all(
-      FEATURED_GAMES_LIST.map(async (item) => {
-        try {
-          return await getGamePriceDetails(item.defaultId, item.name, currency);
-        } catch (e) {
-          return null;
-        }
-      })
-    );
+    const dealsUrl = `https://www.cheapshark.com/api/1.0/deals?pageSize=12&sortBy=Deal%20Rating`;
+    const csResponse = await fetch(dealsUrl, { signal: AbortSignal.timeout(6000) });
 
-    const validResults = featuredResults.filter(Boolean);
-    const payload = { games: validResults };
+    if (csResponse.ok) {
+      const deals: any[] = await csResponse.json();
+      if (Array.isArray(deals) && deals.length > 0) {
+        const mappedDeals = deals.map((deal) => {
+          const title = deal.title || 'Game Deal';
+          return {
+            gameID: String(deal.gameID || ''),
+            dealID: deal.dealID,
+            external: title,
+            cheapest: String(deal.salePrice || deal.normalPrice || '0.00'),
+            normalPrice: deal.normalPrice,
+            salePrice: deal.salePrice,
+            savings: deal.savings,
+            metacriticScore: deal.metacriticScore,
+            thumb: deal.thumb,
+            steamAppID: deal.steamAppID || null,
+            affiliateUrl: STORES.gamivo.getAffiliateUrl(title),
+            merchantDeals: getMerchantDeals(title),
+          };
+        });
 
-    searchCache.set(cacheKey, {
-      data: payload,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
+        searchCache.set(cacheKey, {
+          data: mappedDeals,
+          expiresAt: Date.now() + CACHE_TTL_MS,
+        });
 
-    return res.json(payload);
+        return res.json(mappedDeals);
+      }
+    }
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to fetch featured games' });
+    console.error('Failed to fetch deals feed:', err);
   }
+
+  // Curated fallback
+  const curated = [
+    'Grand Theft Auto V',
+    'Cyberpunk 2077',
+    'Elden Ring',
+    'The Witcher 3: Wild Hunt',
+    'Red Dead Redemption 2',
+    'Helldivers 2',
+  ].map((title, idx) => ({
+    gameID: String(idx + 1),
+    external: title,
+    cheapest: '19.99',
+    thumb: '',
+    steamAppID: null,
+    affiliateUrl: STORES.gamivo.getAffiliateUrl(title),
+    merchantDeals: getMerchantDeals(title),
+  }));
+
+  return res.json(curated);
 });
 
 // In-memory persistent order storage for the session

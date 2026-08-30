@@ -68,19 +68,19 @@ export const HeroSearch: React.FC<HeroSearchProps> = ({
         {/* Banner Tag */}
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400 mb-5 shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Real-time Price Index • Direct Digital Delivery</span>
+          <span>Global Live Price Index • G2A, GAMIVO &amp; Kinguin Deals • Exclusive Discount Vouchers</span>
         </div>
 
         {/* Heading */}
         <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-5xl">
           Search Any Game. <br className="hidden sm:inline" />
-          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-            Get the Lowest Verified Price.
+          <span className="bg-gradient-to-r from-amber-400 via-emerald-300 to-teal-400 bg-clip-text text-transparent">
+            Find the Best Deals.
           </span>
         </h1>
 
         <p className="mx-auto mt-3 max-w-2xl text-sm sm:text-base text-zinc-400">
-          Enter any game title to find the lowest verified prices in real time. Buy genuine activation keys directly with verified delivery and secure checkout.
+          Compare video game prices across global distributors and get instant digital key deals with exclusive voucher codes for G2A (12% OFF), Kinguin (10% OFF), and GAMIVO (8% OFF).
         </p>
 
         {/* Main Search Bar Form */}

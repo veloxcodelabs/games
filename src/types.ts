@@ -1,11 +1,25 @@
+export interface MerchantDeal {
+  storeName: string;
+  affiliateUrl: string;
+  voucherCode: string;
+  discountText: string;
+}
+
 export interface GamePrice {
   id: number | string;
+  gameID?: string;
+  external?: string;
   name: string;
   normalizedName?: string;
+  cheapest?: string;
+  thumb?: string;
+  steamAppID?: string | null;
+  steamAppId?: number;
+  affiliateUrl: string;
+  merchantDeals?: MerchantDeal[];
   edition?: string;
   region?: string;
   platform?: string;
-  steamAppId?: number;
   coverImage?: string;
   headerImage?: string;
   screenshots?: string[];
@@ -23,7 +37,24 @@ export interface GamePrice {
   currencySymbol: string;
   inStock: boolean;
   offersCount?: number;
+  dealID?: string;
+  normalPrice?: string;
+  salePrice?: string;
+  savings?: string;
+  dealRating?: string;
   allEditions?: GameEditionPrice[];
+}
+
+export interface RawGameItem {
+  gameID: string;
+  steamAppID?: string | null;
+  cheapest: string;
+  cheapestDealID?: string;
+  external: string;
+  internalName?: string;
+  thumb: string;
+  affiliateUrl: string;
+  merchantDeals?: MerchantDeal[];
 }
 
 export interface GameEditionPrice {
